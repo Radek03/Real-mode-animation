@@ -8,16 +8,17 @@ start:
     mov si, melody
     mov di, durations
 
-    mov word [y_current], 75 ; pozycja
+    mov word [y_current], 75
     mov word [y_target], 75
-    mov byte [time], 0 ; czas
+    mov byte [time], 0
 
 main_loop:
-    mov ax, [si] ; dzielnik PIT (częstotliwość dla PC-speakera)
+    mov ax, [si]
     push ax
     call play_tone
     pop ax
 
+    ; ruch kwadratu zgodnie z muzyka
     xor dx, dx
     mov bx, 30
     div bx
@@ -25,17 +26,16 @@ main_loop:
     sub dx, ax
     mov [y_target], dx
 
-    call smooth_y ; ustawianie y
-    call draw_frame ; rysowanie klatek
+    call smooth_y
+    call draw_frame
 
     mov ax, [di]
-    imul ax,500 ; tempo animacji (czas trwania pojedynczej nuty)
+    imul ax,500
     call delay
 
     add si, 2
     add di, 2
-    cmp si, melody_end ; kolejne nuty, zapetlanie 
-
+    cmp si, melody_end
     jb main_loop
     mov si, melody
     mov di, durations
@@ -49,7 +49,11 @@ smooth_y:
     add [y_current], ax
     ret
 
-draw_frame: 
+draw_frame:
+    push ax
+    push bx 
+    push cx 
+    push dx 
     push si 
     push di 
     push es
@@ -57,15 +61,18 @@ draw_frame:
     mov ax, 0xA000
     mov es, ax
 
-    call wavefield; tlo
-    call draw_bars; slupki
+    call wavefield
+    call draw_square
 
     inc byte [time]
 
     pop es 
     pop di 
     pop si 
-
+    pop dx 
+    pop cx 
+    pop bx 
+    pop ax
     ret
 
 
@@ -73,69 +80,57 @@ wavefield:
     xor di, di
     mov cx, 320*200
 .loop:
-    xor ax, ax         
     mov al, [time]
     add ax, di
     shr al, 2
     and al, 0x18
     sub al, 0x0F
-    stosb       ; zapis do pamieci
+   
+    stosb
     loop .loop
     ret
 
+draw_square:
+    mov cx, 160        ; X
+    mov bp, 8         ; rozmiar
+    mov dx, [y_current]
 
-draw_bars:
-    xor cx, cx             
-.next_bar:
-    mov ax, [y_current]
+    mov ax, dx
+    mov bx, 320
+    mul bx
+    add ax, cx
+    mov di, ax
+    mov al, 0x0F       ;  kolor
 
-    mov bl, [time]; efekt fali trojkatnej
-    add bl, cl
-    and bl, 15
-    sub ax, bx
-    jns .h_ok
-    xor ax, ax
-.h_ok:
-    cmp ax, 120
-    jbe .h_clip
-    mov ax, 120
-.h_clip:
-
-    mov si, ax              ; wysokosc
-    mov al, ah
-
-    add al, 16              ; kolor 
-
-    ; DI = 199*320 + x
-    mov di, 199*320
-    add di, cx
-
-.bar_y:
-    stosb           ; zapis piksela do pamieci
-    sub di, 320
-    dec si
-    jnz .bar_y
-
-    add cx, 4               ; szerokosc slupka
-    cmp cx, 320
-    jb .next_bar
+    mov bx, bp
+.y:
+    push bx
+    mov bx, bp
+.x:
+    stosb
+    dec bx
+    jnz .x
+    add di, 320
+    sub di, bp
+    pop bx
+    dec bx
+    jnz .y
     ret
-
 
 play_tone:
     mov bx, ax
     mov al, 0xB6
-    out 0x43, al ; tryb fali prostokatnej, generowanej przez pcspeaker
+    out 0x43, al
     mov al, bl
     out 0x42, al
     mov al, bh
     out 0x42, al
-    in al, 0x61 ; właczenie głośnika
+    in al, 0x61
     or al, 3
     out 0x61, al
     ret
 
-delay: ; czas 
+delay:
     push cx
     push dx
     mov cx, ax        
@@ -150,6 +145,9 @@ delay: ; czas
     ret
 
 
+; =====================
+; DANE
+; =====================
 melody:
     ; E4 E4 F4 G4 | G4 F4 E4 D4
     dw 3626,3626,3419,3047,3047,3419,3626,4074
@@ -188,7 +186,6 @@ y_current dw 0
 y_target  dw 0
 time      db 0
 
-; boot signature
 %assign filler_size 510-($-$$)
 times filler_size db 0
 dw 0xAA55

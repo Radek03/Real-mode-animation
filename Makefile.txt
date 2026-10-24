@@ -1,0 +1,20 @@
+ASM=nasm
+ASMFLAGS=-f bin
+IMAGE=floppy.img
+BOOT=boot.bin
+ASM_SRC=boot.asm
+
+all: $(IMAGE)
+
+$(BOOT): $(ASM_SRC)
+	$(ASM) $(ASMFLAGS) $(ASM_SRC) -o $(BOOT)
+
+$(IMAGE): $(BOOT)
+	dd if=/dev/zero of=$(IMAGE) bs=512 count=2880
+	dd if=$(BOOT) of=$(IMAGE) conv=notrunc
+
+run: $(IMAGE)
+	qemu-system-x86_64 -fda $(IMAGE)
+
+clean:
+	rm -f $(BOOT) $(IMAGE)
